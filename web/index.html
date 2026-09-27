@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b6e99">
+  <title>SBDF Multi-Data Explorer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Spotfire SBDF → Parquet → Dashboard</div>
+        <h1 id="appTitle">SBDF Multi-Data Explorer</h1>
+        <p class="subtle">Monitor, combine, join, visualize and export multiple SBDF datasets.</p>
+      </div>
+      <div class="top-actions">
+        <button id="refreshCurrentBtn" class="button primary" type="button">Refresh current</button>
+        <button id="refreshAllBtn" class="button secondary" type="button">Refresh all</button>
+        <a id="downloadBtn" class="button secondary" href="#">Download CSV</a>
+      </div>
+    </header>
+
+    <section class="dataset-bar panel compact-panel" aria-label="Dataset selection">
+      <label class="dataset-select-label">
+        Dataset
+        <select id="datasetSelect" aria-label="Select dataset"></select>
+      </label>
+      <div class="dataset-badges">
+        <span id="kindBadge" class="badge">—</span>
+        <span id="datasetStatusBadge" class="badge">—</span>
+      </div>
+      <div class="dataset-source-wrap">
+        <span class="meta-label">Source</span>
+        <span id="sourceText" class="source-text">—</span>
+      </div>
+    </section>
+
+    <section class="stats-grid" aria-label="Selected dataset status">
+      <article class="stat-card"><span>Rows</span><strong id="rowsStat">—</strong></article>
+      <article class="stat-card"><span>Columns</span><strong id="columnsStat">—</strong></article>
+      <article class="stat-card"><span>Version</span><strong id="versionStat">—</strong></article>
+      <article class="stat-card"><span>Last refresh</span><strong id="refreshStat">—</strong></article>
+    </section>
+
+    <div class="main-grid">
+      <section class="panel visualization-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Visualize selected dataset</h2>
+            <p id="chartMeta" class="subtle">Choose columns to create a grouped chart.</p>
+          </div>
+          <span id="statusMessage" class="small-status"></span>
+        </div>
+
+        <div class="controls-grid">
+          <label>X / Category
+            <select id="xSelect"></select>
+          </label>
+          <label>Y / Metric
+            <select id="ySelect"></select>
+          </label>
+          <label>Aggregation
+            <select id="aggSelect">
+              <option value="count">Count</option>
+              <option value="sum">Sum</option>
+              <option value="avg">Average</option>
+              <option value="min">Minimum</option>
+              <option value="max">Maximum</option>
+            </select>
+          </label>
+          <label>Chart
+            <select id="chartTypeSelect">
+              <option value="bar">Bar</option>
+              <option value="line">Line</option>
+            </select>
+          </label>
+          <label>Sort
+            <select id="sortSelect">
+              <option value="value_desc">Value ↓</option>
+              <option value="value_asc">Value ↑</option>
+              <option value="label_asc">Label A→Z</option>
+              <option value="label_desc">Label Z→A</option>
+            </select>
+          </label>
+          <label>Groups
+            <select id="groupLimitSelect">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="filters-block">
+          <div class="filters-heading">
+            <strong>Optional filters</strong>
+            <button id="clearFiltersBtn" class="text-button" type="button">Clear</button>
+          </div>
+          <div class="filters-grid">
+            <label>Filter column 1
+              <select id="filterColumn1"><option value="">None</option></select>
+            </label>
+            <label>Contains
+              <input id="filterValue1" type="text" placeholder="e.g. EOL">
+            </label>
+            <label>Filter column 2
+              <select id="filterColumn2"><option value="">None</option></select>
+            </label>
+            <label>Contains
+              <input id="filterValue2" type="text" placeholder="e.g. QFN">
+            </label>
+          </div>
+        </div>
+
+        <div class="chart-title-row">
+          <strong id="chartTitle">Chart</strong>
+          <span id="chartError" class="error-text" role="status"></span>
+        </div>
+        <div id="chartWrap" class="chart-wrap" aria-label="Dataset chart"></div>
+      </section>
+
+      <aside class="panel registry-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Dataset registry</h2>
+            <p class="subtle"><span id="datasetCount">0</span> available</p>
+          </div>
+        </div>
+        <div id="datasetList" class="dataset-list"></div>
+        <div class="storage-note">
+          <strong>Storage</strong>
+          <span id="storageText">DuckDB + Parquet</span>
+          <small id="discoveryText">—</small>
+        </div>
+      </aside>
+    </div>
+
+    <section class="panel table-panel">
+      <div class="table-toolbar">
+        <div>
+          <h2>Data preview</h2>
+          <p id="tableMeta" class="subtle">—</p>
+        </div>
+        <div class="table-actions">
+          <label class="search-label">Search current dataset
+            <input id="searchInput" type="search" placeholder="Search rows...">
+          </label>
+          <label>Rows
+            <select id="pageSizeSelect">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr id="tableHead"></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prevBtn" class="button secondary" type="button">Previous</button>
+        <span id="pageText">—</span>
+        <button id="nextBtn" class="button secondary" type="button">Next</button>
+      </div>
+    </section>
+
+    <footer>
+      <span>Local/LAN dashboard — SBDF conversion runs on the Python server.</span>
+      <span id="footerTimestamp">—</span>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

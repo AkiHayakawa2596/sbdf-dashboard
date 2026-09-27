@@ -1,0 +1,139 @@
+name: Build Windows Offline Wheelhouse
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-offline-package:
+    name: Build Windows x64 offline package
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12 x64
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Prepare wheelhouse
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install --upgrade pip
+          New-Item -ItemType Directory -Force -Path wheelhouse | Out-Null
+          python -m pip download `
+            --only-binary=:all: `
+            --dest wheelhouse `
+            -r requirements.txt
+
+      - name: Verify completely offline install
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path .offline-test) { Remove-Item .offline-test -Recurse -Force }
+          python -m venv .offline-test
+          .\.offline-test\Scripts\python.exe -m pip install `
+            --no-index `
+            --find-links=wheelhouse `
+            -r requirements.txt
+          .\.offline-test\Scripts\python.exe -c "from spotfire import sbdf; import duckdb, pandas, flask, requests; print('Offline dependency import test OK')"
+          .\.offline-test\Scripts\python.exe -m pip freeze | Out-File -Encoding ascii requirements-lock.txt
+
+      - name: Verify locked requirements can also install offline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path .offline-lock-test) { Remove-Item .offline-lock-test -Recurse -Force }
+          python -m venv .offline-lock-test
+          .\.offline-lock-test\Scripts\python.exe -m pip install `
+            --no-index `
+            --find-links=wheelhouse `
+            -r requirements-lock.txt
+          .\.offline-lock-test\Scripts\python.exe -c "from spotfire import sbdf; import duckdb, pandas, flask, requests; print('Locked offline install test OK')"
+
+      - name: Smoke-test dashboard from offline environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = Join-Path $PWD '.offline-lock-test/Scripts/python.exe'
+          $process = Start-Process -FilePath $python -ArgumentList 'server.py' -WorkingDirectory $PWD -PassThru -WindowStyle Hidden
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 20; $i++) {
+              Start-Sleep -Seconds 2
+              try {
+                $response = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/health' -TimeoutSec 5
+                if ($response.ok -eq $true) {
+                  $healthy = $true
+                  Write-Host "Health check passed. Mode: $($response.mode)"
+                  break
+                }
+              } catch {
+                Write-Host 'Waiting for dashboard startup...'
+              }
+            }
+            if (-not $healthy) { throw 'Offline-installed dashboard did not pass /health smoke test.' }
+          }
+          finally {
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: Build audit checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lines = @()
+          Get-ChildItem wheelhouse -File | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            $lines += "$hash  wheelhouse/$($_.Name)"
+          }
+          foreach ($file in @('requirements.txt','requirements-lock.txt','server.py','config.json')) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            $lines += "$hash  $file"
+          }
+          $lines | Out-File -Encoding ascii SHA256SUMS.txt
+
+      - name: Package offline deployment ZIP
+        shell: pwsh
+        run: |
+          ./package_offline.ps1
+
+      - name: Upload offline Windows artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: SBDF-Dashboard-Offline-Windows-x64
+          path: dist/SBDF-Dashboard-Offline-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create or update GitHub Release for version tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $asset = "dist/SBDF-Dashboard-Offline-Windows-x64.zip"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --clobber
+          } else {
+            gh release create $tag `
+              "$asset#SBDF Dashboard Offline Windows x64" `
+              --title "SBDF Dashboard $tag" `
+              --generate-notes
+          }

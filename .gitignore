@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.build-venv/
+
+# Build outputs
+build/
+dist/
+*.spec.bak
+
+# Generated dashboard data
+data/csv/*.csv
+data/parquet/*.parquet
+!data/csv/.gitkeep
+!data/parquet/.gitkeep
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Offline package build outputs
+wheelhouse/
+requirements-lock.txt
+SHA256SUMS.txt
+.offline-test/
+.offline-lock-test/
