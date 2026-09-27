@@ -1,0 +1,59 @@
+{
+  "app_title": "SBDF Multi-Data Explorer",
+  "storage_dir": "data",
+  "default_poll_seconds": 60,
+  "scheduler_tick_seconds": 3,
+  "request_timeout_seconds": 120,
+  "verify_tls": true,
+  "request_headers": {},
+  "max_table_search_rows": 200000,
+  "max_chart_groups": 100,
+
+  "discovery": {
+    "enabled": true,
+    "folder": "C:/REPLACE_WITH_APACHE_SBDF_FOLDER",
+    "pattern": "*.sbdf",
+    "recursive": false,
+    "rescan_seconds": 30,
+    "poll_seconds": 60
+  },
+
+  "datasets": [
+    {
+      "id": "production",
+      "name": "Production",
+      "source": "https://YOUR-APACHE-SERVER.example.com/data/production.sbdf",
+      "poll_seconds": 30,
+      "enabled": false
+    },
+    {
+      "id": "defects-live",
+      "name": "Defects Live",
+      "source": "https://YOUR-APACHE-SERVER.example.com/data/defects.sbdf",
+      "poll_seconds": 60,
+      "enabled": false
+    }
+  ],
+
+  "derived": {
+    "append": [
+      {
+        "id": "production-history",
+        "name": "Production History",
+        "members": ["production-jan", "production-feb", "production-mar"],
+        "enabled": false
+      }
+    ],
+    "join": [
+      {
+        "id": "lot-quality",
+        "name": "Lot Quality",
+        "left": "lots",
+        "right": "defects-live",
+        "on": ["LotNumber"],
+        "how": "left",
+        "enabled": false
+      }
+    ]
+  }
+}
