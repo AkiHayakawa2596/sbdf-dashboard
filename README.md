@@ -49,96 +49,69 @@ The browser never needs to understand the binary SBDF format.
 
 ---
 
-# 1. Portable Windows deployment (no install on target PC)
+# 1. Offline Windows deployment (recommended for managed PCs)
 
-The project now separates **building** from **running**.
+For environments where unsigned custom EXEs or BAT launchers are restricted, use the **offline wheelhouse** deployment. The target PC runs the readable Python source with an organization-approved **Python 3.12 x64** installation. All Python dependencies are supplied as local `.whl` files, so pip does not need internet access.
 
-### Build/development PC — one time
-
-The build PC needs Python and internet/package access. Run:
-
-```bat
-build_portable.bat
-```
-
-This creates:
+The GitHub Actions workflow is:
 
 ```text
-dist/SBDF-Dashboard/
-├─ SBDFDashboard.exe
-├─ _internal/
-├─ config.json
-├─ web/
-├─ data/
-├─ Start Dashboard.bat
-└─ PORTABLE-README.txt
+.github/workflows/build-windows-offline-wheelhouse.yml
 ```
 
-and normally also:
+From GitHub, open **Actions → Build Windows Offline Wheelhouse → Run workflow**. The Windows x64 runner will:
 
 ```text
-dist/SBDF-Dashboard-Portable.zip
+requirements.txt
+      ↓
+pip download --only-binary=:all:
+      ↓
+wheelhouse/*.whl
+      ↓
+clean Python 3.12 venv
+      ↓
+pip install --no-index --find-links=wheelhouse
+      ↓
+import test
+      ↓
+requirements-lock.txt
+      ↓
+second clean locked offline install
+      ↓
+server.py /health smoke test
+      ↓
+SHA256SUMS.txt
+      ↓
+SBDF-Dashboard-Offline-Windows-x64.zip
 ```
 
-### Target/end-user PC
+The deployment ZIP intentionally contains **no custom `SBDFDashboard.exe` and no BAT launcher**.
 
-Copy/extract the generated portable folder, then double-click:
+On the target Windows PC, after Python 3.12 x64 is installed/approved, run these commands from Command Prompt:
 
-```text
-Start Dashboard.bat
+```cmd
+cd /d C:\SBDF-Dashboard
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install --no-index --find-links=wheelhouse -r requirements-lock.txt
+.venv\Scripts\python.exe server.py
 ```
 
-The launcher performs **no pip install**, creates no virtual environment, and does not require Python to be installed on the target PC. It starts `SBDFDashboard.exe` and opens:
+Then open:
 
 ```text
 http://localhost:8080
 ```
 
-Keep the whole portable folder together because `_internal/` contains the packaged Python runtime and dependencies. `config.json`, `web/`, and `data/` intentionally remain outside the executable so they can be edited/persisted without rebuilding.
-
-### Development mode
-
-If you want to run the Python source directly instead, use:
-
-```bat
-start_dev.bat
-```
-
-`start_dev.bat` is the only Windows launcher that installs/updates Python packages.
-
-On Linux, `start.sh` remains the source/development launcher.
-
-### Demo mode
-
-If `config.json` still contains placeholder SBDF locations, the app creates demo datasets automatically, so the portable build can be tested before connecting real files.
-
----
-
-
-## Build the Windows portable ZIP from Android / Termux
-
-This version includes a GitHub Actions workflow at:
-
-```text
-.github/workflows/build-windows-portable.yml
-```
-
-You can therefore develop from Android/Termux without building the Windows EXE locally. Push the project to GitHub, open **Actions → Build Windows Portable Dashboard → Run workflow**, and GitHub builds the Windows x64 portable ZIP for you. The workflow also smoke-tests the packaged `/health` endpoint before publishing the artifact.
-
-For complete Android instructions, see:
-
-```text
-TERMUX-GITHUB-BUILD.md
-```
+See `OFFLINE-INSTALL-WINDOWS.md` for the full target-PC procedure and `TERMUX-GITHUB-BUILD.md` for the Android/Termux → GitHub workflow.
 
 A version tag such as:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
-also triggers a build and, if successful, creates a GitHub Release containing `SBDF-Dashboard-Portable.zip`.
+also triggers the offline Windows build and attaches `SBDF-Dashboard-Offline-Windows-x64.zip` to the GitHub Release.
 
 ---
 
@@ -532,11 +505,16 @@ If the SBDF on Apache is a static snapshot and Spotfire only refreshes data inte
 
 ```text
 sbdf-live-dashboard/
+├─ .github/
+│  └─ workflows/
+│     └─ build-windows-offline-wheelhouse.yml
 ├─ config.json
 ├─ requirements.txt
 ├─ server.py
-├─ start.bat
 ├─ start.sh
+├─ package_offline.ps1
+├─ OFFLINE-INSTALL-WINDOWS.md
+├─ TERMUX-GITHUB-BUILD.md
 ├─ README.md
 ├─ data/
 │  ├─ parquet/
@@ -556,3 +534,11 @@ requests
 duckdb
 spotfire
 ```
+
+---
+
+## Offline Windows deployment (recommended for managed enterprise PCs)
+
+The repository now includes a GitHub Actions workflow named **Build Windows Offline Wheelhouse**. It creates `SBDF-Dashboard-Offline-Windows-x64.zip`, containing the source dashboard, a Windows x64/Python 3.12 wheelhouse, an exact dependency lock file, and SHA-256 checksums. The workflow verifies installation with `--no-index` in clean virtual environments and smoke-tests `/health` before publishing the artifact.
+
+See `OFFLINE-INSTALL-WINDOWS.md` and `TERMUX-GITHUB-BUILD.md`.

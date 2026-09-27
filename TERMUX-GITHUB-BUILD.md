@@ -1,142 +1,83 @@
-# Build the Windows portable dashboard from Termux using GitHub Actions
+# Build the offline Windows wheelhouse from Termux using GitHub Actions
 
-You can edit and push this project entirely from Android/Termux. GitHub Actions then supplies the Windows build machine and produces `SBDF-Dashboard-Portable.zip` for you.
+The project can be edited and pushed entirely from Android/Termux. GitHub Actions supplies a Windows x64 build machine and creates an offline deployment ZIP containing the dashboard source and all required Python wheels.
 
-## 1. Install Git in Termux
+## Normal Termux update
 
-```bash
-pkg update
-pkg install git
-```
-
-Optional but useful if you want to authenticate with the GitHub CLI:
+From the repository folder:
 
 ```bash
-pkg install gh
-```
-
-Then authenticate:
-
-```bash
-gh auth login
-```
-
-Choose GitHub.com, HTTPS, and browser/device authentication.
-
-## 2. Create a GitHub repository
-
-Create an empty repository in GitHub, for example:
-
-```text
-sbdf-dashboard
-```
-
-Do not add a README during repository creation if this project already contains one.
-
-## 3. Push this project from Termux
-
-Open the extracted project folder in Termux. Example:
-
-```bash
-cd /storage/emulated/0/Download/sbdf-live-dashboard
-```
-
-If Termux has not been granted shared-storage access yet, run once:
-
-```bash
-termux-setup-storage
-```
-
-Initialize and push:
-
-```bash
-git init
 git add .
-git commit -m "Initial SBDF dashboard"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/sbdf-dashboard.git
-git push -u origin main
+git commit -m "Add offline Windows wheelhouse build"
+git push
 ```
 
-Replace `YOUR-USERNAME` and the repository name with your actual values.
-
-## 4. Run the Windows build from your phone
+## Run the offline build
 
 In GitHub:
 
-1. Open your repository.
+1. Open the repository.
 2. Open **Actions**.
-3. Select **Build Windows Portable Dashboard**.
+3. Select **Build Windows Offline Wheelhouse**.
 4. Tap **Run workflow**.
-5. Keep the branch as `main` and tap **Run workflow**.
+5. Select `main` and run it.
 
-GitHub starts a `windows-latest` runner, installs Python 3.12 and the project dependencies, builds `SBDFDashboard.exe`, smoke-tests `/health`, creates the portable ZIP, and uploads it as an Actions artifact.
-
-## 5. Download the finished portable ZIP
-
-After the workflow succeeds:
-
-1. Open the completed workflow run.
-2. Scroll to **Artifacts**.
-3. Download **SBDF-Dashboard-Windows-x64**.
-4. The artifact contains `SBDF-Dashboard-Portable.zip`.
-
-Extract that ZIP on the target Windows PC. The target PC does not need Python or pip.
-
-## 6. Build a versioned release from Termux
-
-You can also create a tag:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-A tag beginning with `v` automatically starts the Windows build. If the build succeeds, the workflow also creates a GitHub Release and attaches `SBDF-Dashboard-Portable.zip` to that release.
-
-For the next version:
-
-```bash
-git add .
-git commit -m "Update dashboard"
-git push
-
-git tag v1.0.1
-git push origin v1.0.1
-```
-
-## 7. What happens in GitHub Actions
+The workflow uses Windows x64 + Python 3.12 and:
 
 ```text
-Termux / Android
-      |
-      | git push or v* tag
-      v
-GitHub repository
-      |
-      v
-GitHub Actions Windows runner
-      |
-      +-- Python 3.12 x64
-      +-- spotfire 2.4.2
-      +-- pandas / DuckDB / Flask
-      +-- PyInstaller
-      |
-      v
-SBDFDashboard.exe
-      |
-      +-- packaged folder
-      +-- health smoke test
-      v
-SBDF-Dashboard-Portable.zip
-      |
-      +-- Actions artifact
-      +-- GitHub Release asset when built from a v* tag
+requirements.txt
+      ↓
+pip download --only-binary=:all:
+      ↓
+wheelhouse/*.whl
+      ↓
+clean venv
+      ↓
+pip install --no-index --find-links=wheelhouse
+      ↓
+import verification
+      ↓
+requirements-lock.txt
+      ↓
+second clean offline install
+      ↓
+server.py /health smoke test
+      ↓
+SHA256SUMS.txt
+      ↓
+SBDF-Dashboard-Offline-Windows-x64.zip
 ```
 
-## Important notes
+## Download the result
 
-- The workflow builds **Windows x64**.
-- `spotfire==2.4.2` has a Windows x86-64 wheel for Python 3.12, which is why the workflow pins Python 3.12 x64.
-- A normal `git push` to `main` does not build automatically. This avoids wasting Actions minutes while you are editing. Use **Run workflow** when you want a build, or push a `v*` tag for a release build.
-- Never commit confidential SBDF files, passwords, access tokens, or private server credentials to the GitHub repository. Keep real SBDF paths in the deployed `config.json`, or use a private repository when appropriate.
+Open the successful workflow run and scroll to **Artifacts**.
+Download:
+
+```text
+SBDF-Dashboard-Offline-Windows-x64
+```
+
+The artifact contains:
+
+```text
+SBDF-Dashboard-Offline-Windows-x64.zip
+```
+
+Move that ZIP to the approved Windows PC and follow `OFFLINE-INSTALL-WINDOWS.md`.
+
+## Target PC requirement
+
+The target PC needs an organization-approved **Python 3.12 x64** installation, but it does **not** need internet access for pip. All Python packages are installed from the included local `wheelhouse/`.
+
+The deployment ZIP intentionally does not contain the custom PyInstaller `SBDFDashboard.exe` or a BAT launcher.
+
+## Versioned release
+
+A `v*` Git tag also starts the workflow:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+The offline ZIP will also be attached to that GitHub Release.
